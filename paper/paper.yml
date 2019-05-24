@@ -1,21 +1,13 @@
-title: "My JuliaCon proceeding"
+title: "ChipSort: a SIMD and cache-aware sorting module"
 keywords:
   - Julia
-  - Optimization
-  - Game theory
-  - Compiler
+  - Sorting
+  - SIMD
+  - Parallelism
 authors:
-  - name: 1st author
-    orcid: 0000-0003-1361-440X
-    affiliation: 1
-  - name: 2nd author
-    affiliation: 1, 2
-  - name: 3rd author
-    affiliation: 2
+  - name: Nicolau Leal Werneck
+    orcid: 0000-0003-0017-5890
 affiliations:
-  - name: University
-    index: 1
-  - name: National Lab
-    index: 2
-date: 24 April 2019
+  - name: TomTom NV
+date: 22 July 2019
 bibliography: ref.bib

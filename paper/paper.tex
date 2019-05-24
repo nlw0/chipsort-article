@@ -11,12 +11,18 @@
 
 \begin{abstract}
 
-This is a guide for authors who are preparing papers for JuliaCon using the \LaTeX{} document
-preparation system and the \verb juliacon  class file.
+Sorting is a fundamental programming problem with many important applications, being very useful to organize data for fast retrieval. While there are well-known sorting algorithms for conventional computers, especial techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Comb-sort, which lends itself easily to vectorization and achieves good performance in arrays that fit cache memory, with low penalty for random access. This also depends on a parallel in-place matrix transposition implemented in ChipSort. Large arrays are approached with a multi-way Merge-sort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This enables tuning the code generation to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate the increased speed and the hardware adaptation capability of the module.
 
 \end{abstract}
 
 \section{Introduction}
+
+Sorting has enjoyed an important place within computer programming topics for a long time. Apart from having great importance for practical applications, it also attracts much attention as a theoretically interesting problem in itself~\cite{DBLP:books/lib/Knuth98a}. While sorting is a well-understood problem in general, with a few classic algorithms available, achieving optimal performance for specific problems and architectures may require a careful algorithm selection rather than just tuning parameters \cite[Part II, Introduction]{DBLP:books/daglib/0023376}.
+
+The running time of a computer program is governed by many factors, starting with algorithmic complexity and the base clock speed of the processor. The observed performance in real computers has been increasingly depending in processor features that are not taken into account by the simplest models, though. These features include cache memory and paralellism at the processor and instruction level. Cache memory has become popular in consumer processors in the past couple of decades, allowing programs to often attain higher performance than would be possible with a simpler memory architecture, as long as memory access patterns exhibit temporal and spatial locality~\cite[Chapter 3]{Drepper07whatevery}. Writing software that can better cope with paralellism has also become necessary to exploit the full potential offered by modern and future processors~\cite{wilson2018}. 
+
+The practical and theoretical interest in sorting, and the great relevance of cache memory and paralellism in modern computing naturally lead to research on sorting algorithms that take these factors into account.
+chache sort simd \cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08,DBLP:journals/pvldb/InoueT15,DBLP:journals/pvldb/BalkesenATO13}.
 
 The \LaTeX{} document preparation system is a special version of the
 \TeX; typesetting program where-in a collection of \TeX; commands
