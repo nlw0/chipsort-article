@@ -29,13 +29,73 @@ Apart from earlier work on parallel sorting in other architectures, the late 200
 
 This article presents \verb ChipSort, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Comb-sort for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \verb ChipSort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
 
-Following Section~\ref{sec:methods} presents the techniques employed in ChipSort. Section~\ref{sec:experiments} presents experimental results assessing the performance of the module, and Section~\ref{sec:conclusion} brings some concluding remarks.
+Following Section~\ref{sec:methods} presents the techniques employed in ChipSort. Section~\ref{sec:experiments} presents experimental results assessing the performance of the module and Section~\ref{sec:conclusion} brings some concluding remarks.
 
 \section{SIMD sorting methods}
 \label{sec:methods}
 %
+ChipSort offers three high-level functions that can be used in applications as replacements for other sorting functions such as \verb sort  in the Julia standard library. Additional work is required from the user selecting among the three functions and also setting some numeric parameters. The functions are intended to be used with arrays of different sizes, and \verb chipsort_large  offers a good overview of all the techniques implemented in the module. Some of these techniques might also be useful in other applications instead of sorting, one clear example being the in-place matrix transpose. ChipSort does not currently support registers with separate key and payload, what might allow significant optimizations. Only the sorting of simple data types such as 32 and 64-bit integers and floating-point numbers were studied.
+
+This section will present how \verb chipsort_large  works, detailing each step of the process. It mostly follows~\cite{DBLP:journals/pvldb/InoueT15} with a few modifications. This function achieves sorting by first splitting the input array in chunks that are sorted separately with \verb chipsort_medium!  and then merged simultaneously. This inner sort is performed in multiple steps:
+\begin{enumerate}
+\item sorting small blocks of data with a sorting network;
+\item reordering vectors in-place according to a matrix transpose;
+\item vectorized Comb-sort with a limited number of iterations;
+\item regular insertion sort until the whole data is sorted.
+\end{enumerate}  
+The \verb chipsort_small!  function is essentially a sorting network followed by a merge procedure.
+
+The remainder of this section will detail the multiple techniques employed in this process.
+
 \subsection{Sorting Networks}
 %
+Sorting networks~\cite[Sec. 5.3.4]{DBLP:books/lib/Knuth98a} are graphs composed by comparator modules, units that take two numbers in, and output them in order: the smallest and the largest at specific outputs. Properly arranging the compatators allows the creation of a procedure that takes a vector of numbers in, and outputs them in sequence. The design of a sorting network can minimize the total number of comparisons, or also take into account that comparisons can be done in parallel, minimizing the number of steps to complete the process.
+
+A sorting network can be represented by a Knuth graph such as Figure~\ref{fig:sorting-network}. The graph represents a network that takes an array of four values $(A_1, A_2, A_3, A_4)$ and outputs the sorted sequence $(S_1, S_2, S_3, S_4)$. Each vertical line in the graph represents a comparator.
+\begin{figure}[htb]
+\centerline{\includegraphics[width=0.9\linewidth]{fig/sorting-network-4.pdf}}
+\caption{A sorting network for 4 elements. The dashed lines represent sections where operations are independent of each other.}
+\label{fig:sorting-network}
+\end{figure}
+
+In ChipSort, as in the related work, parallelism is mainly exploited by carrying out the comparisons of the sorting network over vectors of size $V$ contained in SIMD registers, effectively running the network $V$ times simultaneously. Other forms of instruction-level parallelism can also be in play, though. In especial, it may also be possible to parallelize instructions such as \verb min  and \verb max , and also the loading of data into registers. This is often done implicitly by the microarchitecture, and programmers can only try to make sure their code is suitable for this by properly ordering operations and avoiding branching, for instance. Part of this work is expected to be performed by the compiler, and especially LLVM in the case of Julia.
+
+ChipSort supports sorting networks of different sizes, currently only powers of 2, which are predefined as data structures in the file \href{https://github.com/nlw0/ChipSort.jl/blob/d2d049b7413f0073476021fa62fb748803130768/src/sorting-network-parameters.jl}{\tt sorting-network-parameters.jl}. The generated function \href{https://github.com/nlw0/ChipSort.jl/blob/d2d049b7413f0073476021fa62fb748803130768/src/sorting-networks.jl#L13}{\tt sort\_net} works by assigning each element of the sequence at each step to a variable, and calculating values from the next step according to the network specification. The comparisons are performed by the {\tt min} and {\tt max} functions, and the function is generic on the element types. Figure~\ref{fig:sort-net-listing}
+
+\begin{figure}[htb]
+\begin{lstlisting}[language = Julia]
+input_0_1 = Base.getindex(input, 1)
+input_0_2 = Base.getindex(input, 2)
+input_0_3 = Base.getindex(input, 3)
+input_0_4 = Base.getindex(input, 4)
+input_1_1 = ChipSort.min(input_0_1, input_0_2)
+input_1_2 = ChipSort.max(input_0_1, input_0_2)
+input_1_3 = ChipSort.min(input_0_3, input_0_4)
+input_1_4 = ChipSort.max(input_0_3, input_0_4)
+input_2_1 = ChipSort.min(input_1_1, input_1_3)
+input_2_3 = ChipSort.max(input_1_1, input_1_3)
+input_2_2 = ChipSort.min(input_1_2, input_1_4)
+input_2_4 = ChipSort.max(input_1_2, input_1_4)
+input_3_1 = input_2_1
+input_3_4 = input_2_4
+input_3_2 = ChipSort.min(input_2_2, input_2_3)
+input_3_3 = ChipSort.max(input_2_2, input_2_3)
+return (input_3_1, input_3_2, input_3_3, input_3_4)
+\end{lstlisting}
+\caption{Code generated by {\tt sort\_net} to implement a 4-element sorting network.}
+\label{fig:sort-net-listing}
+\end{figure}
+
+This function is a good first example of the utilization of Julia's meta-programming features in ChipSort. Multiple implementations of sorting networks are available~\cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08,sortingnetworksjl,ultrasort}, however they implement networks of different sizes straight as code. In ChipSort they are represented as data structures that guide a generated function that produces equivalent code. While this data structure currently is hard-coded, it can potentially be produced only when necessary by an implementation of an algorithm such as Bose-Nelson, what remains a future plan for the module.
+
+The {\tt sort\_net} generated function expects elements that have defined {\tt max } and {\tt min} methods. It can be called with simple data types, {\em e.g.} {\tt sort\_net(4,2,5,3)} works. In practice ChipSort often calls this function with vectors, completely relying on SIMD.jl~\cite{erik_schnetter_2019_2592633}. This module maps a vector in Julia similar to tuples or static arrays straight to LLVM vector types, ensuring SIMD code can be produced when possible.
+
+\subsection{SIMD}
+
+When applied to a group of vectors, the result from the sorting network contains sorted sequences in the lanes of the vectors. To obtain sorted vectors we need to transpose these vectors.
+
+
+
 \subsection{Bitonic Merge Networks}
 %
 \subsection{Vectorized Comb-sort}
@@ -559,3 +619,5 @@ parties, the ref.bib file should be sent with it.
 \end{document}
 
 % Inspired by the International Journal of Computer Applications template
+
+% latexmk -bibtex -pdf paper.tex
