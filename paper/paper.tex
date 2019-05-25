@@ -21,8 +21,37 @@ Sorting has enjoyed an important place within computer programming topics for a 
 
 The running time of a computer program is governed by many factors, starting with algorithmic complexity and the base clock speed of the processor. The observed performance in real computers has been increasingly depending in processor features that are not taken into account by the simplest models, though. These features include cache memory and paralellism at the processor and instruction level. Cache memory has become popular in consumer processors in the past couple of decades, allowing programs to often attain higher performance than would be possible with a simpler memory architecture, as long as memory access patterns exhibit temporal and spatial locality~\cite[Chapter 3]{Drepper07whatevery}. Writing software that can better cope with paralellism has also become necessary to exploit the full potential offered by modern and future processors~\cite{wilson2018}. 
 
-The practical and theoretical interest in sorting, and the great relevance of cache memory and paralellism in modern computing naturally lead to research on sorting algorithms that take these factors into account.
-chache sort simd \cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08,DBLP:journals/pvldb/InoueT15,DBLP:journals/pvldb/BalkesenATO13}.
+The interest in sorting and the great relevance of cache memory and paralellism in modern computing naturally lead to research on sorting algorithms that account for these factors. Processors offering SIMD (single instruction multiple data) instructions and other forms of instruction-level parallelism started to become widely available in the early 2000s. One example is the introduction of SSE instructions in the x86 architecture~\cite[Chapter 1]{kusswurm18}. The current availability of processors with 512 bit registers underscore the need of being able to write software that exploit vector operations, not to mention GPUs. 
+
+At the time CPUs with SIMD instructions became widely available there was already a trend to employ specialized hardware like GPUs for scientific applications~\cite{larsen2001fast,DBLP:conf/micro/ThompsonHO02}. Althoug SIMD was used mostly for multimedia applications at first~\cite{CHEN2006509,DBLP:journals/mam/SlingerlandS05}, we can cite some early alternative uses including 3D graphics~\cite{DBLP:conf/pcm/MaY02} and machine learning~\cite{DBLP:conf/europar/StreyB01}.
+
+Apart from earlier work on parallel sorting in other architectures, the late 2000s saw the first practical demonstrations of sorting with modern consumer SIMD chips~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/ChhuganiNLMHCBKD08}. Most of the techniques utilized then are still employed in more recent works~\cite{DBLP:journals/pvldb/BalkesenATO13,DBLP:journals/pvldb/InoueT15}.
+
+This article presents \verb ChipSort, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Comb-sort for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \verb ChipSort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
+
+Following Section~\ref{sec:methods} presents the techniques employed in ChipSort. Section~\ref{sec:experiments} presents experimental results assessing the performance of the module, and Section~\ref{sec:conclusion} brings some concluding remarks.
+
+\section{SIMD sorting methods}
+\label{sec:methods}
+%
+\subsection{Sorting Networks}
+%
+\subsection{Bitonic Merge Networks}
+%
+\subsection{Vectorized Comb-sort}
+%
+\subsection{In-place matrix transpose}
+%
+\subsection{Vectorized multi-way array merging}
+%
+
+\section{Experiments}
+\label{sec:experiments}
+%
+\section{Conclusion}
+\label{sec:conclusion}
+%
+
 
 The \LaTeX{} document preparation system is a special version of the
 \TeX; typesetting program where-in a collection of \TeX; commands
