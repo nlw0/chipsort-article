@@ -11,7 +11,7 @@
 
 \begin{abstract}
 
-Sorting is a fundamental programming problem with many important applications, being very useful to organize data for fast retrieval. While there are well-known sorting algorithms for conventional computers, especial techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Comb-sort, which lends itself easily to vectorization and achieves good performance in arrays that fit cache memory, with low penalty for random access. This also depends on a parallel in-place matrix transposition implemented in ChipSort. Large arrays are approached with a multi-way Merge-sort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This enables tuning the code generation to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate the increased speed and the hardware adaptation capability of the module.
+Sorting is a fundamental programming problem with many important applications, being very useful to organize data for fast retrieval. While there are well-known sorting algorithms for conventional computers, especial techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Combsort, which lends itself easily to vectorization and achieves good performance in arrays that fit cache memory, with low penalty for random access. This also depends on a parallel in-place matrix transposition implemented in ChipSort. Large arrays are approached with a multi-way Mergesort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This enables tuning the code generation to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate the increased speed and the hardware adaptation capability of the module.
 
 \end{abstract}
 
@@ -27,7 +27,7 @@ At the time CPUs with SIMD instructions became widely available there was alread
 
 Apart from earlier work on parallel sorting in other architectures, the late 2000s saw the first practical demonstrations of sorting with modern consumer SIMD chips~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/ChhuganiNLMHCBKD08}. Most of the techniques utilized then are still employed in more recent works~\cite{DBLP:journals/pvldb/BalkesenATO13,DBLP:journals/pvldb/InoueT15}.
 
-This article presents \verb ChipSort, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Comb-sort for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \verb ChipSort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
+This article presents \verb ChipSort, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Combsort for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \verb ChipSort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
 
 Following Section~\ref{sec:methods} presents the techniques employed in ChipSort. Section~\ref{sec:experiments} presents experimental results assessing the performance of the module and Section~\ref{sec:conclusion} brings some concluding remarks.
 
@@ -40,10 +40,9 @@ This section will present how \verb chipsort_large  works, detailing each step o
 \begin{enumerate}
 \item sorting small blocks of data with a sorting network;
 \item reordering vectors in-place according to a matrix transpose;
-\item vectorized Comb-sort with a limited number of iterations;
+\item vectorized Combsort with a limited number of iterations;
 \item regular insertion sort until the whole data is sorted.
 \end{enumerate}  
-The \verb chipsort_small!  function is essentially a sorting network followed by a merge procedure.
 
 The remainder of this section will detail the multiple techniques employed in this process.
 
@@ -85,19 +84,19 @@ input_3_2 = min(input_2_2, input_2_3)
 input_3_3 = max(input_2_2, input_2_3)
 return (input_3_1, input_3_2, input_3_3, input_3_4)
 \end{lstlisting}
-\caption{The parameters from a four-elements sorting network, and the corresponding code generated by {\tt sort\_net} to implement it.}
+\caption{The parameters from a four-element sorting network consisting of three steps, and the corresponding code generated by {\tt sort\_net}.}
 \label{fig:sort-net-listing}
 \end{figure}
 
 This function is a good first example of the utilization of Julia's meta-programming features in ChipSort. Multiple implementations of sorting networks are available~\cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08,sortingnetworksjl,ultrasort}, however they implement networks of different sizes straight as code. In ChipSort they are represented as data structures that guide a generated function that produces equivalent code. While this data structure currently is hard-coded, it can potentially be produced only when necessary by an implementation of an algorithm such as Bose-Nelson, what remains a future plan for the module.
 
-The {\tt sort\_net} generated function expects elements that have defined {\tt max } and {\tt min} methods. It can be called with simple data types, {\em e.g.} {\tt sort\_net(4,2,5,3)} works. In practice ChipSort often calls this function with vectors, completely relying on SIMD.jl~\cite{erik_schnetter_2019_2592633}. This module maps a vector in Julia similar to tuples or static arrays straight to LLVM vector types, ensuring SIMD code can be produced when possible.
+The {\tt sort\_net} generated function expects elements with {\tt max} and {\tt min} methods defined. It can be called with simple data types, {\em e.g.} {\tt sort\_net(4,2,5,3)} works. In practice ChipSort often calls this function with vectors, completely relying on SIMD.jl~\cite{erik_schnetter_2019_2592633}. This module maps a vector in Julia similar to tuples or static arrays straight to LLVM vector types, ensuring SIMD code can be produced when possible and also allowing the flexibility of handling logic vectors that are larger than the actual registers.
 
 \subsection{SIMD vectors transpose}
+%
+Consider a group of stacked SIMD vectors. Each column in this representation is termed a {\em lane}. The result from {\tt sort\_vecs} is that each lane contains a sorted sequence. This data must be transposed to produce sorted vectors. This is done in ChipSort through {\tt transpose\_vecs}, which is a generated function that supports rectangular matrices, but with dimensions constrained to powers of 2. The generated code consists mostly of calls to {\tt SIMD.shufflevec}. This is another instance of an operation that other projects~\cite{DBLP:journals/pvldb/BalkesenATO13,ultrasort} implement with multiple low-level functions, contemplating each different case, and in ChipSort there is only a single higher-level Julia generated function that produces equivalent code.
 
-Consider a group of stacked SIMD vectors. Each column in this representation is termed a {\em lane}. The result from {\tt sort\_vecs} is that each lane contains a sorted sequence. To obtain sorted vectors we need to transpose these stacked vectors. This is done in ChipSort through {\tt transpose\_vecs}, which is a generated function that supports rectangular matrices, but with dimensions constrained to powers of 2. This function is heavily based on calls to {\tt SIMD.shufflevec}.
-
-Figure~\ref{fig:transpose-vecs} displays an example of 64 random integers loaded into SIMD registers as 4 vectors. After {\tt sort\_vecs} each lane contains a sorted sequence. After {\tt transpose\_vecs} each vector (register) contains a sorted sequence.
+Figure~\ref{fig:transpose-vecs} displays an example of 64 random integers loaded into SIMD registers as 4 vectors. After {\tt sort\_vecs} each lane contains a sorted sequence, and {\tt transpose\_vecs} turns the lanes into vectors (registers). The \verb chipsort_small!  function is essentially a sorting network followed by a transpose and a merge procedure.
 
 \begin{figure}[htb]
 \centerline{\includegraphics[width=0.99\linewidth]{fig/regs.pdf}}
@@ -107,12 +106,40 @@ Figure~\ref{fig:transpose-vecs} displays an example of 64 random integers loaded
 
 \subsection{Bitonic Merge Networks}
 %
-\subsection{Vectorized Comb-sort}
+A bitonic sequence starts either increasing or decreasing and contains at most one change of direction. Bitonic merge networks allow the creation of merge networks of different sizes, and they are again implemented in ChipSort in a single generated function, {\tt bitonic\_merge}. Merging two sorted vectors requires first reversing one of them, and the result is stored in two new vectors of the same size containing the first and second halves of the total sorted sequence.
+
+Apart from the use in sorting small sequences and in the multi-way merge tree, bitonic merge networks can also be used to implement a regular merge sort. This technique was investigated in ChipSort only superficially, and while there were no promising results in terms of performance, ChipSort also contains the generated function {\tt bitonic\_merge\_interleaved} to illustrate how metaprogramming can help implementing multiple simultaneous merges with interleaved execution, as done in other projects~\cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08}.
+
+\subsection{Vectorized Combsort}
 %
+One of the most peculiar aspects of ChipSort, taken directly from AA-sort~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/InoueT15}, is the use of the Combsort algorithm. Combsort is essentially a generalization of Bubble sort in the same way that Shell sort generalizes insertion sort~\cite{dobosiewicz1980efficient,Lacey:1991:FES:117187.117218,DBLP:books/lib/Knuth98a,DBLP:books/daglib/0023376}. The array is sweeped multiple times, and pairs of values at a given distance from each other are compared and stored in order. The distance is reduced at each pass by a factor of $\frac{4}{3}$. This algorithm lends itself easily to vectorization: performing the comparisons over vectors of size $V$ effectively allows us to run the algorithm over $V$ lists simultaneouly.
+
+In practice, ChipSort performs a number of other operations before and after using Combsort. The {\tt chipsort\_medium!} function consists of the following steps:
+
+\begin{enumerate}
+\item Apply a sorting network on $K$ blocks of $J$ vectors of size $V$.
+\item Vectorized Combsort until the interval size is 1.
+\item Transpose blocks.
+\item Transpose data in-place from $K$ blocks of $J$ vectors into $J$ blocks of $K$ vectors.
+\item Vectorized Combsort again.
+\item Sort blocks again.
+\item Insertion sort.
+\end{enumerate}
+
+After the first two steps the result is essentially a matrix where the $K\times J$ columns are the vectors, and each row contains an approximately sorted sequence. The transpose steps reshape each row into a new block. Each row is processed independently at first, and the transpose allows elements from distinct groups to interact.
+
+The last step is necessary to ensure the whole array is sorted, not vieved anymore as a matrix with independent rows. Insertion sort also presents a better performance than sticking to Combsort until the end, what would essentially mean using bubble sort once the interval becomes 1. Because the array is now approximately sorted, it is expected at this time that insertion sort does not have to move any out-of-order elements very far from where they are found.
+
 \subsection{In-place matrix transpose}
 %
+In-place matrix transposition can be attained by moving a number to its destination, then moving the number that was found there, and so on, until a cycle is completed and a new number is selected to be moved~\cite{10.1093/comjnl/2.1.47}. While carrying out this procedure is simple, it is not trivial to find out which are the cycles to tranpose a matrix of any given dimensions, and even finding out the number of cycles turns out to be a difficult problem~\cite[Sec. 1.3.3, Ex. 12]{DBLP:books/lib/Knuth97}.
+
+ChipSort contains the generated function {\tt transpose!} to perform in-place matrix transposition. The cycle seeds are computed at the time of code generation, and at runtime the function only needs to move the data and compute the indices detecting when each cycle finishes. The function is therefore completely generic, supporting any dimensions, but with a very simple runtime code, with the most complex part of the problem being tackled programatically during code generation.
+
 \subsection{Vectorized multi-way array merging}
 %
+
+
 
 \section{Experiments}
 \label{sec:experiments}
