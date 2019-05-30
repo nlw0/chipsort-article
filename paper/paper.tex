@@ -19,9 +19,9 @@ Sorting is a fundamental programming problem with many important applications, b
 
 Sorting has enjoyed an important place within computer programming topics for a long time. Apart from having great importance for practical applications, it also attracts much attention as a theoretically interesting problem in itself~\cite{DBLP:books/lib/Knuth98a}. While sorting is a well-understood problem in general, with a few classic algorithms available, achieving optimal performance for specific problems and architectures may require a careful algorithm selection rather than just tuning parameters \cite[Part II, Introduction]{DBLP:books/daglib/0023376}.
 
-The running time of a computer program is governed by many factors, starting with algorithmic complexity and the base clock speed of the processor. The observed performance in real computers has been increasingly depending in processor features that are not taken into account by the simplest models, though. These features include cache memory and paralellism at the processor and instruction level. Cache memory has become popular in consumer processors in the past couple of decades, allowing programs to often attain higher performance than would be possible with a simpler memory architecture, as long as memory access patterns exhibit temporal and spatial locality~\cite[Chapter 3]{Drepper07whatevery}. Writing software that can better cope with paralellism has also become necessary to exploit the full potential offered by modern and future processors~\cite{wilson2018}. 
+The running time of a computer program is governed by many factors, starting with algorithmic complexity and the base clock speed of the processor. The observed performance in real computers has been increasingly depending in processor features that are not taken into account by the simplest models, though. These features include cache memory and paralellism at the processor and instruction level. Cache memory has become popular in consumer processors in the past couple of decades, allowing programs to often attain higher performance than would be possible with a simpler memory architecture, as long as memory access patterns exhibit temporal and spatial locality~\cite[Chapter 3]{Drepper07whatevery}. Writing software that can better cope with paralellism has also become necessary to exploit the full potential offered by modern and future processors~\cite{wilson2018}.
 
-The interest in sorting and the great relevance of cache memory and paralellism in modern computing naturally lead to research on sorting algorithms that account for these factors. Processors offering SIMD (single instruction multiple data) instructions and other forms of instruction-level parallelism started to become widely available in the early 2000s. One example is the introduction of SSE instructions in the x86 architecture~\cite[Chapter 1]{kusswurm18}. The current availability of processors with 512 bit registers underscore the need of being able to write software that exploit vector operations, not to mention GPUs. 
+The interest in sorting and the great relevance of cache memory and paralellism in modern computing naturally lead to research on sorting algorithms that account for these factors. Processors offering SIMD (single instruction multiple data) instructions and other forms of instruction-level parallelism started to become widely available in the early 2000s. One example is the introduction of SSE instructions in the x86 architecture~\cite[Chapter 1]{kusswurm18}. The current availability of processors with 512 bit registers underscore the need of being able to write software that exploit vector operations, not to mention GPUs.
 
 At the time CPUs with SIMD instructions became widely available there was already a trend to employ specialized hardware like GPUs for scientific applications~\cite{larsen2001fast,DBLP:conf/micro/ThompsonHO02}. Althoug SIMD was used mostly for multimedia applications at first~\cite{CHEN2006509,DBLP:journals/mam/SlingerlandS05}, we can cite some early alternative uses including 3D graphics~\cite{DBLP:conf/pcm/MaY02} and machine learning~\cite{DBLP:conf/europar/StreyB01}.
 
@@ -42,7 +42,7 @@ This section will present how \verb chipsort_large  works, detailing each step o
 \item reordering vectors in-place according to a matrix transpose;
 \item vectorized Combsort with a limited number of iterations;
 \item regular insertion sort until the whole data is sorted.
-\end{enumerate}  
+\end{enumerate}
 
 The remainder of this section will detail the multiple techniques employed in this process.
 
@@ -148,6 +148,16 @@ The intermediate data from the tree is kept by ChipSort in a contiguous array, t
 \section{Experiments}
 \label{sec:experiments}
 %
+\begin{figure}[htb]
+\centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-8k.pdf}}
+\centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-256k.pdf}}
+\caption{Empirical CDF from {\tt chipsort\_medium!} with 8k {\tt UInt32} values and {\tt chipsort\_large} with 256k values. Results from 10,000 measurements. Speedups are 14\% and 3\%.}
+\label{fig:transpose-vecs}
+\end{figure}
+
+
+
+
 \section{Conclusion}
 \label{sec:conclusion}
 %
