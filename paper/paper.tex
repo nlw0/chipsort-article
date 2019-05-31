@@ -150,22 +150,20 @@ The intermediate data from the tree is kept by ChipSort in a contiguous array, t
 \section{Experiments}
 \label{sec:experiments}
 %
-This section reports experiments with the methods offered by the ChipSort library, as well as alternative baseline methods. The term {\it method} can be understood in this article as both the sorting algorithm and their actual implementations in the Julia language. The specific methods tested were:
+This section reports experiments with the methods offered by the ChipSort library, as well as alternative baseline methods. The term {\it method} can be understood as both the sorting algorithm and their actual implementations in the Julia language. The specific methods tested are:
 \begin{itemize}
+\item {\tt chipsort!} Combsort finishing with Insertion sort, written as a serial program and vectorized by the compiler.
 \item {\tt chipsort\_small!} in-register, based on sorting networks.
 \item {\tt chipsort\_medium!} vectorized Combsort, plus additional steps, finishing with Insertion sort.
 \item {\tt chipsort\_large} merge-sort with a multi-way merge tree, starting from chunks processed by {\tt chipsort\_medium!}.
-\item {\tt chipsort\_serial!} non-vectorized, serial Combsort finishing with Insertion sort when the interval becomes 1.
 \item {\tt insertion\_sort!} Insertion sort taken from the Julia library.
 \item {\tt sort!} the Julia standard sort, Quicksort finishing with Insertion sort for small arrays (20 elements).
 \end{itemize}
 
-The function names with a {\tt !} imply in-place operation. The output array allocation time for {\tt chipsort\_large} was not discounted in the experiments. While it may it not be irrelevant, it is small enough to be ignored with no effect to our conclusions.
+The {\tt !} implies in-place operation. The allocation time for {\tt chipsort\_large} was not discounted in our analyses.
 
 \subsection{Small arrays}
-In our first experiment we evaluate the sorting of small arrays, with only 64 32-bit values. The {\tt chipsort\_small} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The small running time makes it challenging to perform proper measurements in this experiment. Our task was therefore to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ random entries. The in-place sorting functions were applied in sequence, in a for-loop. The results are in Table~\ref{tab:bench-small}.
-
-The {\tt chipsort\_small} function achieved a significant speed-up of over 3 times compared to Insertion sort or the Julia standard function, and twice over {\tt chipsort!}.
+In our first experiment we evaluate the sorting of small arrays, with only 64 32-bit values. The {\tt chipsort\_small} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The small running time makes it challenging to perform proper measurements in this experiment. Our task was therefore to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ uniform random entries. The in-place sorting functions were applied in sequence, in a for-loop. The results are in Table~\ref{tab:bench-small}.
 
 \begin{table}[h]
 \tabcolsep22pt
@@ -180,7 +178,7 @@ Julia standard & 222.910 $\mu$s\\\hline
 \label{tab:bench-small}
 \end{table}
 
-This first experiment already demonstrates the potential of {\tt chipsort!}, which presented a speedup of at least 46\% compared to the other alternatives, even though the function based on sorting networks was clearly faster.
+The {\tt chipsort\_small} function achieved a significant speed-up of over 3 times compared to Insertion sort or the Julia standard function, and twice over {\tt chipsort!}. Even though this in-register function was clearly faster, this first experiment already demonstrates the potential of {\tt chipsort!}, which presented a speedup of at least 46\% compared to the other alternatives.
 
 \subsection{Medium and large arrays}
 In our second experiment we compared many different methods on inputs of exponentially increasing sizes, from $2^6$ up to $2^{20}$. Figure~\ref{fig:bench-time} displays the resulting measurements. Although the curves look too concentrated in this visualization, it is possible to notice that {\tt chipsort!} consistently outperforms the Julia standard library {\tt sort!} by a factor of 80\% to 100\%, or up to twice as fast. We can also observe that Insertion sort soon becomes too inefficient.
@@ -199,7 +197,7 @@ Figure~\ref{fig:bench-curves} shows a different visualization from the same data
 \label{fig:bench-curves}
 \end{figure*}
 
-Figure~\ref{fig:bench-cdf} displays the measured times for the test cases with $2^{13}$ and $2^{18}$ elements. It is possible to see how all the ChipSort methods surpass the Julia standard library. In the $2^{13}$ case {\tt chipsort\_medium!} exhibits a slight speedup of 7.3\% over {\tt chipsort!}, and on the $2^{13}$ case it is {\tt chipsort\_large!} with 4.4\%.
+Figure~\ref{fig:bench-cdf} displays the measured times for $2^{13}$ and $2^{18}$ elements. All the tested ChipSort methods surpass the Julia standard library in these cases. In the $2^{13}$ case {\tt chipsort\_medium!} exhibits a slight speedup of 7.3\% over {\tt chipsort!}, and on the $2^{13}$ case it is {\tt chipsort\_large!} with 4.4\%.
 
 \begin{figure}[htb]
 \centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-8k.pdf}}
@@ -208,12 +206,16 @@ Figure~\ref{fig:bench-cdf} displays the measured times for the test cases with $
 \label{fig:bench-cdf}
 \end{figure}
 
-
-
-
 \section{Conclusion}
 \label{sec:conclusion}
 %
+We have presented ChipSort, a Julia module for SIMD and cache-aware sorting. The main sorting method utilized in ChipSort is Combsort finalized with Insertion sort. This method is based on previous proposals for SIMD sorting~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/InoueT15} and other practical sorting methods~\cite{INCERPI198737,musser1997introspective}. This method can be implemented as a serial program that can be vectorized by the Julia compiler and LLVM, resulting in a sorting function up to twice as fast as the Julia standard library. This performance holds for at least a million 32-bit elements in a conventional computer.
+
+Other techniques available in ChipSort are sorting networks, bitonic merge networks, in-place matrix transpose and a multi-way merge tree. Vectorized in-register sorting, although limited to small powers of 2, proved to deliver speedups of up to 3 times relative to the standard library. For large arrays there have been limited results, only narrowly surpassing the main ChipSort method in few occasions. Merge-based techniques are expected to be more advantageous when sorting large registers, minimizing memory access.
+
+The main ChipSort method relies heavily on compiler optimizations, while other methods utilize explicit vectorization trough SIMD.jl. ChipSort makes extensive use of metaprogramming, in epecial Julia generated functions. This allows functions like sorting networks to be implemented in an abstract and generic way, based on representations of the networks as data structures used to assemble the final code by a high-level program. This contrasts with similar implementations in other libraries where networks are implemented straight as final functions. Julia also has the opportunity of performing many other optimizations since the library is implemented in Julia with abstract methods that can be specialized.
+
+The best result obtained in ChipSort is a simple serial function that gets vectorized. 
 
 
 \input{bib.tex}
