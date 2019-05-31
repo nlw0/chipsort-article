@@ -111,9 +111,9 @@ Apart from the use in sorting small sequences and in the multi-way merge tree, b
 
 \subsection{Vectorized Combsort}
 %
-One of the most peculiar aspects of ChipSort, taken directly from AA-sort~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/InoueT15}, is the use of the Combsort algorithm. Combsort is essentially a generalization of Bubble sort in the same way that Shell sort generalizes Insertion sort~\cite{dobosiewicz1980efficient,Lacey:1991:FES:117187.117218,DBLP:books/lib/Knuth98a,DBLP:books/daglib/0023376}. The array is swept multiple times, and pairs of values at a given distance from each other are compared and stored in order. The distance is reduced at each pass by a factor of $\frac{4}{3}$. This algorithm lends itself easily to vectorization: performing the comparisons over vectors of size $V$ effectively allows us to run the algorithm over $V$ lists simultaneously.
+One of the most peculiar aspects of ChipSort, taken directly from AA-sort~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/InoueT15}, is the use of the Combsort algorithm. Combsort is essentially a generalization of Bubble sort in the same way that Shell sort generalizes Insertion sort~\cite{dobosiewicz1980efficient,Lacey:1991:FES:117187.117218,DBLP:books/lib/Knuth98a,DBLP:books/daglib/0023376,INCERPI198737}. The array is swept multiple times, and pairs of values at a given distance from each other are compared and stored in order. The distance is reduced at each pass by a factor of $\frac{4}{3}$. This algorithm lends itself easily to vectorization: performing the comparisons over vectors of size $V$ effectively allows us to run the algorithm over $V$ lists simultaneously.
 
-ChipSort contains two functions that utilize Combsort. The first is {\em chipsort!}, a serial implementation of the algorithm which is vectorized implicitly by the compiler optimizations. {\tt chipsort!} starts like Combsort until the interval size is 1, when it switches to Insertion sort. This is similar to what is often done in practical implementations of Quicksort, as in the Julia standard library, switching to Insertion sort when the array becomes too small. The difference is that Combsort is not a divide-and-conquer approach, and therefore Insertion sort is applied only once through the whole array.
+ChipSort contains two functions that utilize Combsort. The first is {\em chipsort!}, a serial implementation of the algorithm which is vectorized implicitly by the compiler optimizations. {\tt chipsort!} starts with Combsort until the interval size is 1, when it switches to Insertion sort. This is similar to what is often done in practical implementations of Quicksort, as in the Julia standard library, switching to Insertion sort when the array becomes too small. The difference is that Combsort is not a divide-and-conquer approach, and therefore Insertion sort is applied only once through the whole array. Shell sort also terminates naturally applying Insertion sort to a partially sorted array.
 
 The other function is {\tt chipsort\_medium!}, an explicitly vectorized implementation utilizing {\tt SIMD.jl}. This second function also performs a number of other operations before and after using Combsort. It consists of the following steps:
 \begin{enumerate}
@@ -128,7 +128,9 @@ The other function is {\tt chipsort\_medium!}, an explicitly vectorized implemen
 
 After the first two steps the result is essentially a matrix where the $K\times J$ columns are the vectors, and each row contains an approximately sorted sequence. The transpose steps reshape each row into a new block. Each row is processed independently at first, and the transpose allows elements from distinct groups to interact. The last step is necessary to ensure the whole array is sorted, not viewed anymore as a matrix with independent rows.
 
-In both implementations switching to Insertion sort presents a better performance than sticking to Combsort until the end. It essentially means using Bubble sort once the interval becomes 1, therefore looking for an alternative seems like a good idea. Insertion sort should fare well because the array is now approximately sorted, and it should not have to move any out-of-order elements very far from where they are found. This utilization of Insertion sort as a final stage to Combsort does not seem to have been considered in the literature before, and may be the main contribution of the present work.
+In both implementations switching to Insertion sort presents a better performance than sticking to Combsort until the end. It essentially means using Bubble sort once the interval becomes 1, therefore looking for an alternative seems like a good idea. Insertion sort should fare well because the array is now approximately sorted, and it should not have to move any out-of-order elements very far from where they are found.
+
+Finishing a sorting method with Insertion sort is a common practice, present at least in Musser's Introsort~\cite{musser1997introspective}. The utilization of Insertion sort as a final stage to Combsort has been considered before in the literature~\cite{combwiki,INCERPI198737}, although this method does not seem to enjoy wide adoption. The main contribution of the present work may be to propose again this method in the SIMD context, extending AA-sort~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/InoueT15}, bringing experimental evidence of its good performance.
 
 \subsection{In-place matrix transpose}
 %
@@ -197,9 +199,7 @@ Figure~\ref{fig:bench-curves} shows a different visualization from the same data
 \label{fig:bench-curves}
 \end{figure*}
 
-Figure~\ref{fig:bench-cdf} displays the measured times for
-
- Speedups are 7.3\% and 4.4\%.
+Figure~\ref{fig:bench-cdf} displays the measured times for the test cases with $2^{13}$ and $2^{18}$ elements. It is possible to see how all the ChipSort methods surpass the Julia standard library. In the $2^{13}$ case {\tt chipsort\_medium!} exhibits a slight speedup of 7.3\% over {\tt chipsort!}, and on the $2^{13}$ case it is {\tt chipsort\_large!} with 4.4\%.
 
 \begin{figure}[htb]
 \centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-8k.pdf}}
