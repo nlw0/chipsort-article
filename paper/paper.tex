@@ -13,7 +13,7 @@
 
 \begin{abstract}
 
-Sorting is a fundamental programming problem with many important applications. While there are well-known sorting algorithms for conventional computers, especial techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Combsort, which lends itself easily to vectorization and can achieve good performance depending on the memory access cost. Insertion sort is used to finalize. Large arrays are approached with a multi-way Mergesort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This permits tuning the code to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate speed gains compared to multiple standard libraries.
+Sorting is a fundamental programming problem with many important applications. While there are well-known sorting algorithms for conventional computers, special techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Combsort, which lends itself easily to vectorization and can achieve good performance depending on the memory access cost. Insertion sort is used to finalize. Large arrays are approached with a multi-way Mergesort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This permits tuning the code to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate speed gains compared to multiple standard libraries.
 
 \end{abstract}
 
@@ -61,7 +61,7 @@ A sorting network can be represented by a Knuth graph such as Figure~\ref{fig:so
 \label{fig:sorting-network}
 \end{figure}
 
-In \chipsort, as in the related work, parallelism is mainly exploited by carrying out the comparisons of the sorting network over vectors of size $V$ contained in SIMD registers, effectively running $V$ networks simultaneously. Other forms of instruction-level parallelism can also be in play, though. In especial, it may be possible to parallelize instructions such as \verb min  and \verb max , or the loading of data into registers. This is often done implicitly by the microarchitecture, and programmers can only make sure their code is suitable for this by properly ordering operations and avoiding branching, for instance. Part of this work is expected to be performed by the compiler, and especially LLVM in the case of Julia.
+In \chipsort, as in the related work, parallelism is mainly exploited by carrying out the comparisons of the sorting network over vectors of size $V$ contained in SIMD registers, effectively running $V$ networks simultaneously. Other forms of instruction-level parallelism can also be in play, though. It may be possible to parallelize instructions such as \verb min  and \verb max , or the loading of data into registers. This is often done implicitly by the microarchitecture, and programmers can only make sure their code is suitable for this by properly ordering operations and avoiding branching, for instance. Part of this work is expected to be performed by the compiler, and in particular LLVM in the case of Julia.
 
 \chipsort supports sorting networks of different sizes, currently only powers of 2, which are predefined as data structures in the file \href{https://github.com/nlw0/\chipsort.jl/blob/d2d049b7413f0073476021fa62fb748803130768/src/sorting-network-parameters.jl}{\tt sorting-network-parameters.jl}. The generated function \href{https://github.com/nlw0/\chipsort.jl/blob/d2d049b7413f0073476021fa62fb748803130768/src/sorting-networks.jl#L13}{\tt sort\_net} works by assigning each element of the sequence at each step to a variable, and calculating values from the next step according to the network specification. The comparisons are performed by the {\tt min} and {\tt max} functions, and the function is generic on the element types. Figure~\ref{fig:sort-net-listing} shows one example of generated code.
 
@@ -155,7 +155,7 @@ The intermediate data from the tree is kept by \chipsort in a contiguous array, 
 \section{Experiments}
 \label{sec:experiments}
 %
-This section reports experiments with the methods offered by the \chipsort library, as well as alternative baseline methods. The term {\it method} can be understood as both the algorithms and their implementations in the Julia language. The specific methods tested are:
+This section reports experiments with the \chipsort methods, as well as alternative ones. The term {\it method} can be understood as both the algorithms and their implementations in the Julia language. The specific methods tested are:
 \begin{itemize}
 \item {\tt chipsort!} Combsort finishing with Insertion sort, written as a serial program and vectorized by the compiler.
 \item {\tt chipsort\_small!} in-register, based on sorting networks.
@@ -168,7 +168,7 @@ This section reports experiments with the methods offered by the \chipsort libra
 The {\tt !} implies in-place operation. The allocation time for {\tt chipsort\_large} was not discounted in our analyses.
 
 \subsection{Small arrays}
-In our first experiment we evaluate the sorting of small arrays, with only 64 32-bit values. The {\tt chipsort\_small} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The small running time makes it challenging to perform proper measurements in this experiment. Our task was therefore to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ uniform random entries. The in-place sorting functions were applied in sequence, in a for-loop. The results are in Table~\ref{tab:bench-small}.
+In our first experiment we evaluate the sorting of small arrays, with 64 32-bit values. The {\tt chipsort\_small!} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The small running time makes it challenging to perform proper measurements in this experiment. Our task was therefore to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ uniform random entries. Sorting was then performed in-place, in a for-loop. The results are in Table~\ref{tab:bench-small}.
 
 \begin{table}[h]
 \tabcolsep22pt
@@ -183,7 +183,7 @@ Julia standard & 222.910 $\mu$s\\\hline
 \label{tab:bench-small}
 \end{table}
 
-The {\tt chipsort\_small} function achieved a significant speed-up of over 3 times compared to Insertion sort or the Julia standard function, and twice over {\tt chipsort!}. Even though the in-register function was clearly faster, this first experiment already demonstrates the potential of {\tt chipsort!}, which presented a speedup of at least 46\% compared to the other alternatives.
+The {\tt chipsort\_small} function achieved a significant acceleration of over 3 times relative to Insertion sort or the Julia standard function, and twice over {\tt chipsort!}. Even though the in-register function was clearly faster, this first experiment already demonstrates the potential of {\tt chipsort!}, which presented a speedup of at least 46\% compared to the other alternatives.
 
 \subsection{Medium and large arrays}
 In our second experiment we compared many different methods on inputs of exponentially increasing sizes, from $2^6$ up to $2^{20}$. Figure~\ref{fig:bench-time} displays the resulting measurements. Although the curves look too concentrated in this visualization, it is possible to notice that {\tt chipsort!} consistently outperforms the Julia standard library {\tt sort!} by a factor of 80\% to 100\%, or up to twice as fast. We can also observe that Insertion sort soon becomes too inefficient.
@@ -194,7 +194,7 @@ In our second experiment we compared many different methods on inputs of exponen
 \label{fig:bench-time}
 \end{figure}
 
-Figure~\ref{fig:bench-curves} shows a different visualization from the same data in Figure~\ref{fig:bench-time}, with the times divided by the input size at each point. Here we can see more clearly how {\tt chipsort\_medium} and {\tt chipsort\_large} slightly outperform {\tt chipsort!} in a few cases.
+Figure~\ref{fig:bench-curves} shows a different visualization from the same data in Figure~\ref{fig:bench-time}, with the times divided by the input size at each point. The vertical dashed lines indicate where the input array would be as big as each cache level. Here we can see more clearly how {\tt chipsort\_medium!} and {\tt chipsort\_large} slightly outperform {\tt chipsort!} in a few cases.
 
 \begin{figure*}[htb]
 \centerline{\includegraphics[width=0.75\linewidth]{fig/chipsort-bench-curves.pdf}}
@@ -212,7 +212,7 @@ Figure~\ref{fig:bench-cdf} displays the measured times for $2^{13}$ and $2^{18}$
 \end{figure}
 
 \subsection{Other languages}
-A simple experiment was also carried out with other programming languages in the same machine to provide a richer context. Table~\ref{tab:bench-cxx} diplays statistics collected from Julia, Python and C++ programs. For the case of Python the value obtained when calling the function through PyCall was better than measuring in the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia interoperation using Cxx.jl were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the significantly worse performance from the C++ standard libraries. Supposedly there are important optimizations missing.
+A simple experiment was also carried out with other programming languages in the same machine to provide a richer context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using Cxx.jl were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance from the C++ standard library.
 
 \begin{table}[h]
 \tabcolsep11pt
@@ -236,13 +236,13 @@ We have presented \chipsort, a Julia module for SIMD and cache-aware sorting. Th
 
 Other techniques available in \chipsort are sorting networks, bitonic merge networks, in-place matrix transpose and a multi-way merge tree. Vectorized in-register sorting, although limited to small powers of 2, proved to deliver speedups of up to 3 times relative to the standard library.
 
-Results were limited for the method dedicated to large arrays, only narrowly surpassing the main \chipsort method in few occasions. Merge-based techniques may be more advantageous when sorting large registers, though.
+Results were limited for the method dedicated to large arrays, only narrowly surpassing the main \chipsort method in few cases. Merge-based techniques may be more advantageous when sorting large records, though.
 
-The main \chipsort method relies heavily on compiler optimizations, while other methods utilize explicit vectorization trough SIMD.jl. \chipsort makes extensive use of metaprogramming, in especial Julia generated functions. This allows functions like sorting networks to be implemented in an abstract and generic way. The networks are represented as data structures, used by a higher-level program to assemble the final network code. This contrasts with other libraries where different networks are implemented straight as final functions. Julia also has the opportunity to performing many optimizations since \chipsort is implemented in pure Julia with abstract methods that can be specialized.
+While the main \chipsort method relies on compiler optimizations, other methods utilize explicit vectorization trough SIMD.jl. \chipsort makes extensive use of metaprogramming, more specifically Julia generated functions. This allows functions like sorting networks to be implemented in an abstract and generic way. The networks are represented as data structures, used by a higher-level program to assemble the final network code. This contrasts with other libraries where different networks are implemented straight as final functions. Julia also has the opportunity to perform many optimizations since \chipsort is implemented in pure Julia with abstract methods that can be specialized.
 
-It is a testament to the quality of the Julia compiler infrastructure that the most successful method implemented in \chipsort has no explicit vectorization or intrinsics. It is just a simple, scalar implementation of Combsort that is optimized by the compiler to generate code adapted to different problem settings and to the hardware architecture at run-time. In the cases where explicit vectorization can produce better code, though, Julia still offers a suitable framework that allowed \chipsort to implement sophisticated techniques with concise code. And while this project can illustrate how well Julia implements traditional language features such as parametric types, its metaprogramming features make it stand out from other languages even more.
+It is a testament to the quality of the Julia compiler infrastructure that the most successful method implemented in \chipsort has no explicit vectorization or intrinsics. It is just a simple, scalar implementation of Combsort that is optimized by the compiler to generate code adapted to different problem settings and to the hardware architecture at run-time. And in the cases where explicit vectorization can produce better code Julia still offers a suitable framework that allowed \chipsort to implement sophisticated techniques with concise code. This project can illustrate how well Julia implements traditional language features such as parametric types, and its metaprogramming features make it stand out from other languages even more.
 
-Some future prospects for \chipsort are to better deal with floating-point comparisons; implement stable sorting of key-register data; explore the limits of in-register processing, especially in modern 512-bit architectures an eventually GPUs; explore how to interact with the compiler in order to produce optimized code for complex tasks such as multi-stage multi-threaded merge sorting of large arrays.
+Some future prospects for \chipsort are to better deal with floating-point comparisons; implement stable sorting of key-payload data; explore the limits of in-register processing, specially in modern 512-bit architectures an eventually GPUs; explore how to interact with the compiler in order to produce optimized code for complex tasks such as multi-stage multi-threaded merge sorting of large arrays.
 
 
 
