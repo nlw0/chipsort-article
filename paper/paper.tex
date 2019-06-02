@@ -13,7 +13,7 @@
 
 \begin{abstract}
 
-Sorting is a fundamental programming problem with many important applications. While there are well-known sorting algorithms for conventional computers, special techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Combsort, which lends itself easily to vectorization and can achieve good performance depending on the memory access cost. Insertion sort is used to finalize. Large arrays are approached with a multi-way Mergesort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, and more specifically Julia's generated functions. This permits tuning the code to specific tasks and hardware at runtime, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate speed gains compared to multiple standard libraries.
+Sorting is a fundamental programming problem with many important applications. While there are well-known sorting algorithms for conventional computers, special techniques are required to take the most out of real hardware offering features such as cache memory and instruction-level parallelism. ChipSort is a Julia module for SIMD and cache-aware sorting. It implements sorting networks and bitonic merge networks with SIMD instructions, with configurable vector sizes. It also implements Combsort, which lends itself easily to vectorization and can achieve good performance depending on the memory access cost. Insertion sort is used to finalize. Large arrays are approached with a multi-way Mergesort. The implementation of ChipSort itself is of interest from a programming languages perspective due to its use of metaprogramming, more specifically Julia's generated functions. This enables custom code generation for different tasks and hardware at run-time, a feat owed to Julia. This article presents the implemented techniques as well as experiments that demonstrate speed gains compared to multiple standard libraries.
 
 \end{abstract}
 
@@ -189,15 +189,15 @@ The {\tt chipsort\_small} function achieved a significant acceleration of over 3
 In our second experiment we compared many different methods on inputs of exponentially increasing sizes, from $2^6$ up to $2^{20}$. Figure~\ref{fig:bench-time} displays the resulting measurements. Although the curves look too concentrated in this visualization, it is possible to notice that {\tt chipsort!} consistently outperforms the Julia standard library {\tt sort!} by a factor of 80\% to 100\%, or up to twice as fast. We can also observe that Insertion sort soon becomes too inefficient.
 
 \begin{figure}[htb]
-\centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-time.pdf}}
+\centerline{\includegraphics[width=0.9\linewidth]{fig/chipsort-bench-time.pdf}}
 \caption{Running time of the different sorting methods studied.}
 \label{fig:bench-time}
 \end{figure}
 
 Figure~\ref{fig:bench-curves} shows a different visualization from the same data in Figure~\ref{fig:bench-time}, with the times divided by the input size at each point. The vertical dashed lines indicate where the input array would be as big as each cache level. Here we can see more clearly how {\tt chipsort\_medium!} and {\tt chipsort\_large} slightly outperform {\tt chipsort!} in a few cases.
 
-\begin{figure*}[htb]
-\centerline{\includegraphics[width=0.75\linewidth]{fig/chipsort-bench-curves.pdf}}
+\begin{figure*}[thb]
+\centerline{\includegraphics[width=0.7\linewidth]{fig/chipsort-bench-curves.pdf}}
 \caption{Curves displaying the relative running time from each studied method. The ordinate represents the median of the measured running times divided by the input size at each test.}
 \label{fig:bench-curves}
 \end{figure*}
@@ -205,14 +205,14 @@ Figure~\ref{fig:bench-curves} shows a different visualization from the same data
 Figure~\ref{fig:bench-cdf} displays the measured times for $2^{13}$ and $2^{18}$ elements. All the tested \chipsort methods surpass the Julia standard library in these cases. In the $2^{13}$ case {\tt chipsort\_medium!} exhibits a slight speedup of 7.3\% over {\tt chipsort!}, and on the $2^{13}$ case it is {\tt chipsort\_large!} with 4.4\%.
 
 \begin{figure}[htb]
-\centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-8k.pdf}}
-\centerline{\includegraphics[width=0.99\linewidth]{fig/chipsort-bench-256k.pdf}}
+\centerline{\includegraphics[width=0.9\linewidth]{fig/chipsort-bench-8k.pdf}}
+\centerline{\includegraphics[width=0.9\linewidth]{fig/chipsort-bench-256k.pdf}}
 \caption{Empirical CDF from different methods with 8k and 256k {\tt UInt32} values. Results from 10,000 measurements.}
 \label{fig:bench-cdf}
 \end{figure}
 
 \subsection{Other languages}
-A simple experiment was also carried out with other programming languages in the same machine to provide a richer context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using Cxx.jl were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance from the C++ standard library.
+A simple experiment was also carried out with different programming languages in the same machine, and with Julia in different machines to provide a richer context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using Cxx.jl were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance from the C++ standard library.
 
 \begin{table}[h]
 \tabcolsep11pt
@@ -228,6 +228,21 @@ C++ {\tt std::sort} & 1,207.23 $\mu$s & 224.71 ms\\\hline
 \label{tab:bench-cxx}
 \end{table}
 
+Table~\ref{tab:bench-512} contains the results for {\tt chipsort!} and the Julia standard {\tt sort!} in an Intel processor with AVX512 instructions, and an ARM processor with NEON instructions.
+\begin{table}[h]
+\tabcolsep11pt
+\tbl{Sorting arrays of 8k and 1M {\tt UInt32} elements in different platforms.}{
+\begin{tabular}{|l|r|r|}\hline
+Method & 8k & 1M\\\hline
+AXV512 \chipsort & 177.4 $\mu$s & 35.20 ms\\\hline
+AXV512 Julia standard & 347.5 $\mu$s & 69.07 ms\\\hline
+NEON \chipsort & 350.9 $\mu$s & 73.36 ms\\\hline
+NEON Julia standard & 573.2 $\mu$s & 113.68 ms\\\hline
+\end{tabular}}
+\label{tab:bench-512}
+\end{table}
+
+No change in performance can be seen in the AVX512 machine, and on the ARM machine the speedup was smaller than before: only 60\%. The most notable fact in this experiment is the fact the same code was successfully employed to produce a vectorized sort on machines with different vector sizes and even instruction sets, always with beneficial effects.
 
 \section{Conclusion}
 \label{sec:conclusion}
