@@ -19,17 +19,17 @@ Sorting is a fundamental programming problem with many important applications. W
 
 \section{Introduction}
 
-Sorting has enjoyed an important place within computer programming topics for a long time. It has great importance to practical applications, being very useful to organize data for fast retrieval, and also attracts attention as a theoretically interesting problem in itself~\cite{DBLP:books/lib/Knuth98a}. While sorting is a well-understood problem in general, with a few classic algorithms available, achieving optimal performance for specific problems and architectures may require a careful algorithm selection rather than just tuning parameters \cite[Part II, Introduction]{DBLP:books/daglib/0023376}.
+Sorting has enjoyed an important place within computer programming topics for a long time. It has great importance to practical applications, being very useful to organize data for fast retrieval, and also attracts attention as a theoretically interesting problem in itself~\cite{DBLP:books/lib/Knuth98a}. While sorting is a well-understood problem in general, with a few classic algorithms available, achieving optimal performance for specific problems and architectures may require a careful algorithm selection rather than a simple parameter tuning \cite[Part II, Introduction]{DBLP:books/daglib/0023376}.
 
-The running time of a computer program is governed by many factors, starting with algorithmic complexity and the base clock speed of the processor. The performance observed in real computers has been increasingly depending in processor features that are not taken into account by the simplest models, though. These features include cache memory and paralellism at the processor and instruction levels. Cache memory has become popular in consumer processors in the past couple of decades, and as long as memory access patterns exhibit temporal and spatial locality, it often allows programs to attain a higher performance than would be possible with a simpler memory architecture~\cite[Chapter 3]{Drepper07whatevery}. Writing software that can better cope with parallelism has also become necessary to exploit the full potential offered by modern and future processors~\cite{wilson2018}.
+Many factors can influence the running time of a computer program, starting with algorithmic complexity and the base clock speed of the processor. The performance observed in real computers has been increasingly depending on processor features that are not taken into account by the simplest models, though. These features include cache memory and parallelism at the processor and instruction levels. Cache memory has become popular in consumer processors in the past couple of decades, and as long as memory access patterns exhibit temporal and spatial locality, it allows programs to attain a higher performance than would be possible with a simpler memory architecture~\cite[Chapter 3]{Drepper07whatevery}. Writing software with better support for parallelism has also become necessary to utilize the full potential offered by modern and future processors~\cite{wilson2018}.
 
-The interest in sorting and the great relevance of cache memory and parallelism to modern computing naturally led to research on sorting algorithms that account for these factors. Processors offering SIMD (single instruction, multiple data) instructions and other forms of instruction-level parallelism started to become widely available in the early 2000s. One example is the introduction of SSE instructions in the x86 architecture~\cite[Chapter 1]{kusswurm18}. The current availability of processors with 512 bit registers underscores the need of being able to write software that exploits vector operations, what can also benefit GPU programming.
+The interest in sorting and the great relevance of cache memory and parallelism to modern computing have naturally led to research on sorting algorithms that account for these factors. Processors offering SIMD (single instruction, multiple data) instructions and other forms of instruction-level parallelism started to become widely available in the early 2000s. One example is the introduction of SSE instructions in the x86 architecture~\cite[Chapter 1]{kusswurm18}. The current availability of processors with 512 bit registers underscores the necessity of being able to write software that utilizes vector operations, what can also benefit GPU programming.
 
 At the time SIMD CPUs became widely available there was already a trend to employ specialized hardware like GPUs for scientific applications~\cite{larsen2001fast,DBLP:conf/micro/ThompsonHO02}. Although SIMD was used mostly for multimedia applications at first~\cite{CHEN2006509,DBLP:journals/mam/SlingerlandS05}, some early alternative uses include 3D graphics~\cite{DBLP:conf/pcm/MaY02} and machine learning~\cite{DBLP:conf/europar/StreyB01}.
 
 Following earlier work on parallel sorting in other architectures, the late 2000s saw the first practical demonstrations of sorting with modern consumer SIMD chips~\cite{DBLP:conf/IEEEpact/InoueMKN07,DBLP:journals/pvldb/ChhuganiNLMHCBKD08}. Most of the techniques utilized then are still employed in more recent works~\cite{DBLP:journals/pvldb/BalkesenATO13,DBLP:journals/pvldb/InoueT15}.
 
-This article presents {\tt ChipSort.jl}, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Combsort for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \chipsort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
+This article presents {\tt ChipSort.jl}, a Julia module that implements SIMD and cache-aware sorting utilizing some of the techniques found in the literature. These include sorting and merging networks, the use of Combsort with Insertion sort finalization for medium sized arrays and of multi-way merging for large arrays. These techniques require not only tuning parameters such as vector and array sizes, but also generating specific code when implementing different size networks. \chipsort seeks to generate efficient custom code for each task, relying on Julia metaprogramming capabilities for that.
 
 Section~\ref{sec:methods} ahead presents the techniques employed in \chipsort. Section~\ref{sec:experiments} presents experimental results assessing the performance of the module and Section~\ref{sec:conclusion} brings some concluding remarks.
 
@@ -43,7 +43,7 @@ The way \chipsort  works mostly follows~\cite{DBLP:journals/pvldb/InoueT15}, alt
 The function {\tt chipsort\_large} achieves sorting by first splitting the input array in chunks that are sorted separately with {\tt chipsort\_medium!}  and then merged simultaneously. This inner sort is performed in multiple steps:
 \begin{enumerate}
 \item sorting small blocks of data with a sorting network;
-\item reordering vectors in-place according to a matrix transpose;
+\item reordering vectors in memory according to a matrix transpose;
 \item vectorized Combsort with a limited number of iterations;
 \item regular insertion sort until the whole data is sorted.
 \end{enumerate}
@@ -52,7 +52,7 @@ The remainder of this section details the multiple techniques employed in this p
 
 \subsection{Sorting networks}
 %
-Sorting networks~\cite[Sec. 5.3.4]{DBLP:books/lib/Knuth98a} are graphs composed by comparator modules, units that take two numbers in, and output them in order: the smallest and the largest at specific outputs. By properly arranging the comparators we can create a procedure to takes a vector of elements and output them in sequence. The design of a sorting network can minimize the total number of comparisons, or if they can be done in parallel, minimize the number of steps to complete the process.
+Sorting networks~\cite[Sec. 5.3.4]{DBLP:books/lib/Knuth98a} are graphs composed by comparator modules, units that take two numbers in, and output the smallest and largest at specific outputs. By properly arranging comparators we can create a procedure to take an array of elements and output them in sequence. The design of a sorting network can minimize the total number of comparisons, or if they can be done in parallel, minimize the number of steps to complete the process.
 
 A sorting network can be represented by a Knuth graph such as Figure~\ref{fig:sorting-network}. Each vertical line is a comparator. The graph represents a network that takes an array of four values $(A_1, A_2, A_3, A_4)$ and outputs the sorted sequence $(S_1, S_2, S_3, S_4)$.
 \begin{figure}[htb]
@@ -110,9 +110,9 @@ Figure~\ref{fig:transpose-vecs} displays an example of 16 random integers loaded
 
 \subsection{Bitonic Merge Networks}
 %
-A bitonic sequence starts either increasing or decreasing and contains at most one change of direction. Bitonic merge networks allow the creation of merge networks of different sizes, and they are again implemented in \chipsort in a single generated function, \href{https://github.com/nlw0/ChipSort.jl/blob/10eb1a962e720aee2bf8733c832468b51a782c1a/src/bitonic-merge-network.jl#L12}{\tt bitonic\_merge}. Merging two sorted vectors requires first reversing one of them, and the result is stored in two vectors containing the first and second halves of the complete sorted sequence.
+A bitonic sequence starts either increasing or decreasing and contains at most one change of direction. Bitonic merge networks allow the creation of merge networks of different sizes, and they are again implemented in \chipsort with a single generated function, \href{https://github.com/nlw0/ChipSort.jl/blob/10eb1a962e720aee2bf8733c832468b51a782c1a/src/bitonic-merge-network.jl#L12}{\tt bitonic\_merge}. Merging two sorted vectors requires first reversing one of them, and the result is stored in two vectors containing the first and second halves of the complete sorted sequence.
 
-Apart from the use in sorting small sequences and in the multi-way merge tree, bitonic merge networks can also be used to implement a regular merge sort. This technique was investigated in \chipsort only superficially, and while there were no promising results in terms of performance, \chipsort also contains the generated function {\tt bitonic\_merge\_interleaved} to illustrate how metaprogramming can help implementing multiple simultaneous merges with interleaved execution, as done in other projects~\cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08}.
+Apart from the use in sorting small sequences and in the multi-way merge tree, bitonic merge networks can also be used to implement a regular merge sort. This technique was investigated in \chipsort only superficially, and while there were no promising results in terms of performance, \chipsort also contains the generated function {\tt bitonic\_merge\_interleaved} to illustrate how metaprogramming can help implement multiple simultaneous merges with interleaved execution, as done in other projects~\cite{DBLP:journals/pvldb/ChhuganiNLMHCBKD08}.
 
 \subsection{Vectorized Combsort}
 %
@@ -131,9 +131,9 @@ The other function is {\tt chipsort\_medium!}, an explicitly vectorized implemen
 \item Insertion sort.
 \end{enumerate}
 
-After the first two steps the result is essentially a matrix where the $K\times J$ columns are the vectors, and each row contains an approximately sorted sequence. The transpose steps reshape each row into a new block. Each row is processed independently at first, and the transpose allows elements from distinct groups to interact. The last step is necessary to ensure the whole array is sorted, not viewed anymore as a matrix with independent rows.
+After the first two steps the result is essentially a matrix where the $K\times J$ columns are the vectors, and each of the $V$ rows contains an approximately sorted sequence. The transpose steps reshape each row into a new block. Each row is processed independently at first, and the transpose allows elements from distinct groups to interact. The last step is necessary to ensure the whole array is sorted, not viewed anymore as a matrix with independent rows.
 
-In both implementations switching to Insertion sort presents a better performance than sticking to Combsort until the end. Once the interval becomes 1 the algorithm essentially turns into Bubble sort, therefore looking for an alternative seems like a good idea. Insertion sort should fare well because the array is now approximately sorted, and any out-of-order elements found should be close to their destinations.
+In both implementations switching to Insertion sort presents a better performance than sticking to Combsort until the end. Once the interval becomes 1 Combsort essentially becomes Bubble sort, thus finding an alternative seems beneficial. Insertion sort should fare well because the array is now approximately sorted, and any out-of-order elements should be already close to their destinations.
 
 Finishing a sorting method with Insertion sort is a common practice, present at least in Musser's Introsort~\cite{musser1997introspective}. This is also akin to the classic method used in the Julia standard library, switching to Insertion sort when the array becomes too small. The difference is that Combsort is not a divide-and-conquer approach, and therefore Insertion sort must be applied once on the whole array.
 
@@ -141,9 +141,9 @@ The utilization of Insertion sort as a final stage to Combsort has been consider
 
 \subsection{In-place matrix transpose}
 %
-In-place matrix transposition can be attained by moving a number to its destination, then moving the number that was found there, and so on, until a cycle is completed and a new number is selected to be moved~\cite{10.1093/comjnl/2.1.47}. While carrying out this procedure is simple, it is not trivial to find out what are the cycles to transpose a matrix of any given dimensions, and even finding out the number of cycles turns out to be a difficult problem~\cite[1.3.3-12]{DBLP:books/lib/Knuth97}.
+In-place matrix transposition can be attained by moving a number to its destination, then moving away the number that was found there, and so on, until a cycle is completed and a new number is selected to be moved~\cite{10.1093/comjnl/2.1.47}. While carrying out this procedure is simple, it is not trivial to find out what are the cycles to transpose a matrix of any given dimensions, and even finding out the number of cycles turns out to be a difficult problem~\cite[1.3.3-12]{DBLP:books/lib/Knuth97}.
 
-\chipsort contains the generated function \href{https://github.com/nlw0/ChipSort.jl/blob/10eb1a962e720aee2bf8733c832468b51a782c1a/src/transpose-vecs.jl#L19}{\tt transpose!} to perform in-place matrix transposition. The cycle seeds are computed at the time of code generation, and at run-time the function only moves the data, computing the index sequences and detecting when each cycle finishes. Therefore even though the function is completely generic, supporting any dimensions, the most complex part of the problem is tackled programmatically during code generation, resulting in a very simple run-time code.
+\chipsort contains the generated function \href{https://github.com/nlw0/ChipSort.jl/blob/10eb1a962e720aee2bf8733c832468b51a782c1a/src/transpose-vecs.jl#L19}{\tt transpose!} to perform in-place matrix transposition. The cycle seeds are computed at the time of code generation, and at run-time the function only moves the data, computing the index sequences and detecting when each cycle finishes. Therefore even though the function is completely generic, supporting any shape, the most complex part of the problem is tackled programmatically during code generation, resulting in a very simple run-time code.
 
 \subsection{Vectorized multi-way merging}
 %
@@ -157,7 +157,7 @@ The intermediate data from the tree is kept by \chipsort in a contiguous array, 
 \section{Experiments}
 \label{sec:experiments}
 %
-This section reports experiments with the \chipsort methods, as well as alternative ones. The term {\it method} can be understood as both the algorithms and their implementations in the Julia language. The specific methods tested are:
+This section reports experiments with the \chipsort methods, as well as alternative ones. The term {\it method} can be understood as both the algorithms and their implementations in the Julia language. The specific methods tested were:
 \begin{itemize}
 \item {\tt chipsort!} Combsort finishing with Insertion sort, written as a serial program and vectorized by the compiler.
 \item {\tt chipsort\_small!} in-register, based on sorting networks.
@@ -170,15 +170,15 @@ This section reports experiments with the \chipsort methods, as well as alternat
 The {\tt !} implies in-place operation. The allocation time for {\tt chipsort\_large} was not discounted in our analyses.
 
 \subsection{Small arrays}
-In our first experiment we evaluate the sorting of small arrays, with 64 32-bit values. The {\tt chipsort\_small!} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The small running time makes it challenging to perform proper measurements in this experiment. Our task was therefore to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ uniform random entries. Sorting was then performed in-place, in a for-loop. The results are in Table~\ref{tab:bench-small}.
+In our first experiment we evaluate the sorting of small arrays, with 64 32-bit values. The {\tt chipsort\_small!} method based on sorting and bitonic merge networks was compared to serial Insertion sort, the Julia sort and {\tt chipsort!}. The short running time makes it challenging to perform proper measurements, therefore the task was to sort 128 sequences of 64 contiguous values in memory, forming a single block of $2^{13}$ uniform random entries. Sorting was performed in-place, in a for-loop. The results are in Table~\ref{tab:bench-small}.
 
 \begin{table}[h]
 \tabcolsep22pt
 \tbl{Sorting $128 \times 64$ {\tt UInt32} elements.}{
 \begin{tabular}{|l|r|}\hline
 Method & Median time\\\hline
-\chipsort small & 57.206 $\mu$s\\\hline
-\chipsort & 133.510 $\mu$s\\\hline
+{\tt chipsort\_small!} & 57.206 $\mu$s\\\hline
+{\tt chipsort!} & 133.510 $\mu$s\\\hline
 Insertion sort & 194.679 $\mu$s\\\hline
 Julia standard & 222.910 $\mu$s\\\hline
 \end{tabular}}
@@ -213,8 +213,8 @@ Figure~\ref{fig:bench-cdf} displays the measured times for $2^{13}$ and $2^{18}$
 \label{fig:bench-cdf}
 \end{figure*}
 
-\subsection{Other languages}
-A simple experiment was also carried out with different programming languages in the same machine, and with Julia in different machines to provide a richer context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using {\tt Cxx.jl} were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance of the C++ standard library.
+\subsection{Other platforms}
+A final experiment was carried out with different programming languages in the same machine and with Julia in different machines, to provide more context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using {\tt Cxx.jl} were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance of the C++ standard library.
 
 \begin{table}[h]
 \tabcolsep11pt
@@ -230,7 +230,7 @@ C++ {\tt std::sort} & 1,207.23 $\mu$s & 224.71 ms\\\hline
 \label{tab:bench-cxx}
 \end{table}
 
-Table~\ref{tab:bench-512} contains the results for {\tt chipsort!} and the Julia standard {\tt sort!} in an Intel processor with AVX512 instructions, and an ARM processor with NEON instructions.
+Table~\ref{tab:bench-512} contains the results for {\tt chipsort!} and the Julia standard {\tt sort!} on an Intel processor with AVX512 instructions, and an ARM processor with 128-bit NEON instructions.
 \begin{table}[h]
 \tabcolsep11pt
 \tbl{Sorting arrays of 8k and 1M {\tt UInt32} elements in different hardware platforms.}{
@@ -243,8 +243,7 @@ NEON & Julia standard & 573.2 $\mu$s & 113.68 ms\\\hline
 \end{tabular}}
 \label{tab:bench-512}
 \end{table}
-
-No change in performance can be seen in the AVX512 machine, and on the ARM machine the speedup was smaller than before: only 60\%. The most notable fact in this experiment is that the same high-level and serial code successfully produced a vectorized sort on machines with different vector sizes and even instruction sets, always with a beneficial outcome.
+No change in performance can be seen on the AVX512 machine, and on the ARM machine the speedup was smaller than before: only 60\%. The most notable fact in this experiment is that the same high-level and serial code successfully produced a vectorized sort on machines with different vector sizes and even instruction sets, always with a beneficial outcome.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -259,7 +258,7 @@ While the main \chipsort method relies on compiler optimizations, other methods 
 
 It is a testament to the quality of the Julia compiler infrastructure that the most successful method implemented in \chipsort has no explicit vectorization or intrinsics. It is just a simple, scalar implementation of Combsort that is optimized by the compiler to generate code adapted to different problem settings and to the hardware architecture at run-time. And in the cases where explicit vectorization is necessary Julia still offers a suitable framework that allowed \chipsort to implement sophisticated techniques with concise code. This project can illustrate how well Julia implements traditional language features such as parametric types, and its metaprogramming features make it stand out from other languages even more.
 
-Some future prospects for \chipsort are to implement missing features such as stable sorting of key-payload data and buffers in the merge tree; explore the limits of in-register processing in modern 512-bit architectures an eventually GPUs; explore how to interact with the compiler in order to optimize code for complex tasks such as multi-stage multi-threaded merge-sorting of large arrays.
+Some future prospects for \chipsort are to implement missing features such as buffers in the merge tree and stable sorting of key-payload data; explore the limits of in-register processing in modern 512-bit architectures an eventually GPUs; explore how to interact with the compiler in order to optimize code for complex tasks such as multi-stage multi-threaded merge-sorting of large arrays.
 
 
 
