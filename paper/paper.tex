@@ -216,7 +216,7 @@ Figure~\ref{fig:bench-cdf} displays the measured times for $2^{13}$ and $2^{18}$
 \end{figure*}
 
 \subsection{Other platforms}
-One last experiment was carried out with different programming languages in the same machine and with Julia in different machines, to provide more context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. Versions utilized were Julia 1.3.0-DEV.431, Python 3.6.8 with Numpy 1.14.3 and GCC 8.3.0 with libstdc++ 6.0.25 on a Ubuntu 18.04 system. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using {\tt Cxx.jl} were slightly worse than native, thus discarded. While Numpy was almost as fast as Julia, no reason could be found for the dismal performance of the C++ standard library.
+One last experiment was carried out with different programming languages in the same machine and with Julia in different machines, to provide more context. Table~\ref{tab:bench-cxx} displays statistics collected from Julia, Python and C++ programs. The experiment was performed with a Ubuntu 18.04 system using Julia 1.3.0-DEV.431, Python 3.6.8 with Numpy 1.14.3 and GCC 8.3.0 with {\tt -O3 -march=native} and libstdc++ 6.0.25. For the case of Python the measurements obtained by calling the function through PyCall were better than using the native Python shell, therefore the best value was kept. Results obtained for C++ with Julia inter-operation using {\tt Cxx.jl} were slightly worse than native, thus discarded. Numpy, C++ {\tt sort} and Julia all presented similar performance, unmatched by C++ {\tt qsort}. These methods make little to no use of SIMD, enabling \chipsort to surpass them.
 
 \begin{table}[h]
 \tabcolsep11pt
@@ -226,8 +226,8 @@ Method & 8k & 1M\\\hline
 \chipsort & 172.35 $\mu$s & 35.28 ms\\\hline
 Julia standard & 337.03 $\mu$s & 68.39 ms\\\hline
 Numpy via PyCall & 354.55 $\mu$s & 70.01 ms\\\hline
-C++ {\tt std::qsort} & 770.93 $\mu$s & 143.48 ms\\\hline
-C++ {\tt std::sort} & 1,177.54 $\mu$s & 221.27 ms\\\hline
+C++ {\tt std::sort} & 374.20 $\mu$s & 68.10 ms\\\hline
+C++ {\tt std::qsort} & 589.52 $\mu$s & 108.2 ms\\\hline
 \end{tabular}}
 \label{tab:bench-cxx}
 \end{table}
