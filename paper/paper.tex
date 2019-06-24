@@ -4,6 +4,7 @@
 \setcounter{page}{1}
 
 \begin{document}
+\lstset{aboveskip=4pt, belowskip=4pt}
 
 \newcommand{\chipsort}{{\tt ChipSort}\xspace}
 
@@ -261,6 +262,8 @@ While the main \chipsort method relies on compiler optimizations, other methods 
 It is a testament to the quality of the Julia compiler infrastructure that the most successful method implemented in \chipsort has no explicit vectorization or intrinsics. It is just a simple, scalar implementation of Combsort that is optimized by the compiler to generate code adapted to different problem settings and to the hardware architecture at run-time. And in the cases where explicit vectorization is necessary Julia still offers a suitable framework that allowed \chipsort to implement sophisticated techniques with concise code. This project can illustrate how well Julia implements traditional language features such as parametric types, and its metaprogramming features make it stand out from other languages even more.
 
 Some future prospects for \chipsort are to implement missing features such as buffers in the merge tree and stable sorting of key-payload data; explore the limits of in-register processing in modern 512-bit architectures an eventually GPUs; explore how to interact with the compiler in order to optimize code for complex tasks such as multi-stage multi-threaded merge-sorting of large arrays.
+
+
 
 
 
