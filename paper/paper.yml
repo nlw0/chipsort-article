@@ -8,7 +8,9 @@ keywords:
 authors:
   - name: Nicolau Leal Werneck
     orcid: 0000-0003-0017-5890
+    affiliation: 1
 affiliations:
   - name: TomTom NV
+    index: 1
 date: 22 July 2019
 bibliography: ref.bib
